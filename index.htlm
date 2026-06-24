@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Business Revenue Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    body { background:#f5f6fa; color:#14161f; }
+    .app { min-height:100vh; display:grid; grid-template-columns:260px 1fr; }
+    .sidebar {
+      background:#090b12; color:white; padding:24px 18px; border-right:1px solid rgba(255,255,255,.08);
+      position:sticky; top:0; height:100vh;
+    }
+    .brand { display:flex; align-items:center; gap:12px; margin-bottom:34px; padding:0 8px; }
+    .logo {
+      width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,#27e38c,#4e7cff);
+      display:grid; place-items:center; font-weight:900; color:#061014; box-shadow:0 0 28px rgba(39,227,140,.25);
+    }
+    .brand h1 { font-size:20px; letter-spacing:-.03em; }
+    .brand span { color:#8e98ad; font-size:12px; }
+    .nav { display:flex; flex-direction:column; gap:8px; }
+    .nav button {
+      color:#aeb6c7; background:transparent; border:none; text-align:left; padding:12px 13px; border-radius:12px;
+      font-size:14px; display:flex; align-items:center; gap:10px; transition:.2s ease; cursor:pointer;
+    }
+    .nav button.active,.nav button:hover { background:rgba(255,255,255,.08); color:#fff; }
+    .sidebar-card {
+      position:absolute; bottom:18px; left:18px; right:18px; background:linear-gradient(145deg,rgba(39,227,140,.14),rgba(78,124,255,.14));
+      border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:16px;
+    }
+    .sidebar-card p { color:#b8c0d4; font-size:13px; line-height:1.4; margin-top:8px; }
+    .main { padding:24px; overflow:hidden; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; gap:18px; }
+    .eyebrow { color:#788296; font-size:13px; margin-bottom:6px; }
+    .topbar h2 { font-size:30px; letter-spacing:-.04em; font-weight:850; }
+    .actions { display:flex; align-items:center; gap:12px; }
+    .search {
+      background:white; border:1px solid #e3e6ee; border-radius:14px; padding:12px 15px; min-width:260px;
+      color:#7b8495; font-size:14px; box-shadow:0 10px 30px rgba(20,22,31,.04); outline:none;
+    }
+    .date-pill {
+      background:#090b12; color:white; border-radius:14px; padding:12px 16px; font-size:14px;
+      box-shadow:0 12px 30px rgba(9,11,18,.16); white-space:nowrap;
+    }
+    .view { display:none; animation:fade .22s ease; }
+    .view.active { display:block; }
+    @keyframes fade { from { opacity:0; transform:translateY(6px);} to { opacity:1; transform:translateY(0);} }
+
+    .card { background:white; border:1px solid #e8ebf2; border-radius:22px; box-shadow:0 14px 40px rgba(20,22,31,.06); }
+    .hero-grid { display:grid; grid-template-columns:1.55fr .9fr; gap:18px; margin-bottom:18px; }
+    .hero-card { padding:22px; min-height:360px; }
+    .card-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:14px; }
+    .card-title { font-size:16px; font-weight:780; letter-spacing:-.02em; }
+    .subtle { color:#7a8394; font-size:13px; margin-top:4px; }
+    .big-number { font-size:42px; font-weight:850; letter-spacing:-.05em; margin-top:4px; }
+    .green { color:#19b56f; }
+    .red { color:#e05252; }
+    .tag { border-radius:999px; padding:7px 10px; font-size:12px; font-weight:700; background:#eefaf4; color:#15945f; white-space:nowrap; }
+    .tag.blue-tag { background:#edf5ff; color:#1a62cc; }
+    .chart-wrap { height:210px; margin-top:14px; }
+    .mini-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:18px; }
+    .mini-stat { background:#f8f9fc; border:1px solid #edf0f5; border-radius:16px; padding:14px; }
+    .mini-stat span { color:#7c8495; font-size:12px; }
+    .mini-stat strong { display:block; font-size:19px; margin-top:4px; letter-spacing:-.03em; }
+
+    .right-stack { display:grid; gap:18px; }
+    .dark-card {
+      padding:20px; background:#090b12; color:white; overflow:hidden; position:relative;
+    }
+    .dark-card:after {
+      content:""; position:absolute; width:180px; height:180px; border-radius:50%;
+      background:rgba(39,227,140,.14); right:-60px; top:-60px; filter:blur(3px);
+    }
+    .dark-card .subtle { color:#9099ad; }
+    .balance-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; position:relative; z-index:2; }
+    .balance-box { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:13px; }
+    .balance-box span { color:#aeb7ca; font-size:12px; }
+    .balance-box strong { display:block; margin-top:4px; font-size:18px; }
+
+    .quick-card { padding:18px; }
+    .quick-list { display:grid; gap:10px; margin-top:14px; }
+    .quick-item {
+      display:flex; justify-content:space-between; align-items:center; background:#f8f9fc; border:1px solid #edf0f5;
+      border-radius:14px; padding:12px; font-size:13px; cursor:pointer; transition:.2s ease;
+    }
+    .quick-item:hover, tr.clickable:hover { background:#f0f5ff; }
+    .quick-item b { display:block; font-size:14px; margin-bottom:2px; }
+
+    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+    .metric-card { padding:18px; min-height:150px; cursor:pointer; transition:.2s ease; }
+    .metric-card:hover { transform:translateY(-2px); box-shadow:0 18px 44px rgba(20,22,31,.09); }
+    .metric-top { display:flex; justify-content:space-between; gap:8px; }
+    .metric-label { color:#70798b; font-size:13px; font-weight:650; }
+    .metric-value { font-size:27px; font-weight:850; letter-spacing:-.04em; margin-top:8px; }
+    .spark { height:52px; margin-top:14px; }
+
+    .content-grid { display:grid; grid-template-columns:1.25fr .8fr; gap:18px; margin-bottom:18px; }
+    .table-card { padding:20px; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; font-size:13px; }
+    th { text-align:left; color:#7b8496; font-weight:700; border-bottom:1px solid #edf0f5; padding:12px 10px; }
+    td { padding:14px 10px; border-bottom:1px solid #f0f2f7; font-weight:600; }
+    tr.clickable { cursor:pointer; transition:.2s ease; }
+
+    .product { display:flex; align-items:center; gap:10px; }
+    .avatar {
+      width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#f8eaff,#dff5ff);
+      display:grid; place-items:center; font-weight:850; color:#46516a; font-size:12px;
+    }
+    .status { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:750; color:#1f9e68; }
+    .dot { width:7px; height:7px; border-radius:50%; background:#1fca7c; display:inline-block; }
+
+    .funnel-card,.donut-card,.activity-card,.forecast-card,.large-panel,.detail-card { padding:20px; }
+    .bars { margin-top:18px; display:grid; gap:13px; }
+    .bar-row { display:grid; gap:7px; }
+    .bar-info { display:flex; justify-content:space-between; color:#596173; font-size:13px; font-weight:700; }
+    .track { height:12px; background:#eef1f6; border-radius:999px; overflow:hidden; }
+    .fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#27e38c,#4e7cff); }
+
+    .bottom-grid { display:grid; grid-template-columns:.85fr 1.15fr 1fr; gap:18px; }
+    .donut-wrap { height:220px; margin-top:10px; }
+    .activity-list { display:grid; gap:12px; margin-top:15px; }
+    .activity { display:flex; gap:11px; align-items:flex-start; padding:12px; border-radius:15px; background:#f8f9fc; border:1px solid #edf0f5; }
+    .activity-icon {
+      width:32px; height:32px; border-radius:10px; background:#10131d; color:white; display:grid; place-items:center; font-size:13px; flex-shrink:0;
+    }
+    .activity b { display:block; font-size:13px; margin-bottom:3px; }
+    .activity p { color:#7a8394; font-size:12px; line-height:1.35; }
+    .forecast-total { display:flex; align-items:end; justify-content:space-between; margin-top:12px; }
+    .forecast-total strong { font-size:34px; letter-spacing:-.04em; }
+    .forecast-chart { height:150px; margin-top:14px; }
+
+    .section-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:18px; }
+    .two-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; }
+    .list-line { display:flex; justify-content:space-between; gap:12px; padding:13px 0; border-bottom:1px solid #eef1f6; font-size:14px; }
+    .list-line:last-child { border-bottom:none; }
+    .member-card { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:14px; border:1px solid #eef1f6; border-radius:16px; margin-top:10px; background:#fbfcfe; }
+    .pill { border-radius:999px; background:#eefaf4; color:#14895b; padding:6px 9px; font-size:12px; font-weight:800; }
+    .button-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+    .btn { border:none; border-radius:13px; padding:11px 14px; font-weight:750; cursor:pointer; background:#10131d; color:white; }
+    .btn.secondary { background:#edf1f7; color:#202637; }
+
+    .modal-backdrop {
+      position:fixed; inset:0; background:rgba(5,7,12,.54); display:none; align-items:center; justify-content:center; padding:18px; z-index:50;
+    }
+    .modal-backdrop.active { display:flex; }
+    .modal { background:white; border-radius:24px; max-width:620px; width:100%; padding:22px; box-shadow:0 30px 80px rgba(0,0,0,.24); }
+    .modal-top { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:16px; }
+    .close { border:none; background:#f0f2f7; width:36px; height:36px; border-radius:12px; cursor:pointer; font-size:18px; }
+
+    @media (max-width:1180px) {
+      .app { grid-template-columns:1fr; }
+      .sidebar { position:relative; height:auto; }
+      .sidebar-card { position:static; margin-top:18px; }
+      .hero-grid,.content-grid,.bottom-grid,.two-grid { grid-template-columns:1fr; }
+      .grid-4,.mini-row,.section-grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media (max-width:680px) {
+      .main { padding:16px; }
+      .topbar { align-items:flex-start; flex-direction:column; }
+      .actions { width:100%; flex-direction:column; align-items:stretch; }
+      .search { min-width:100%; }
+      .grid-4,.mini-row,.section-grid { grid-template-columns:1fr; }
+      .big-number { font-size:34px; }
+      table { font-size:12px; }
+      th,td { padding:10px 6px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">B</div>
+        <div>
+          <h1>Business Portal</h1>
+          <span>Revenue Dashboard</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="active" data-view="overview">▣ Overview</button>
+        <button data-view="revenue">◍ Revenue</button>
+        <button data-view="services">▦ Services</button>
+        <button data-view="leads">◌ Leads</button>
+        <button data-view="marketing">▤ Marketing</button>
+        <button data-view="finance">◇ Finance</button>
+        <button data-view="growth">◈ Growth Plan</button>
+        <button data-view="settings">⚙ Settings</button>
+      </nav>
+
+      <div class="sidebar-card">
+        <strong>This month</strong>
+        <p>Revenue is up, 126 leads were generated, 29 bookings were tracked, and new website plus ad updates are live.</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="pageEyebrow">Business revenue dashboard</p>
+          <h2 id="pageTitle">Money, performance, and generated growth work</h2>
+        </div>
+        <div class="actions">
+          <input class="search" id="searchBox" placeholder="Search revenue, services, leads, marketing..." />
+          <div class="date-pill">Client: West Chester Detailing</div>
+        </div>
+      </header>
+
+      <section class="view active" id="overview">
+        <section class="hero-grid">
+          <div class="card hero-card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Total sales</p>
+                <p class="big-number">$12,840 <span class="green" style="font-size:18px;">↑ 16%</span></p>
+                <p class="subtle">Compared to $11,060 from the previous 30 days</p>
+              </div>
+              <span class="tag">Healthy month</span>
+            </div>
+
+            <div class="chart-wrap"><canvas id="salesChart"></canvas></div>
+
+            <div class="mini-row">
+              <div class="mini-stat"><span>Net revenue</span><strong>$10,980</strong></div>
+              <div class="mini-stat"><span>Booked jobs</span><strong>29</strong></div>
+              <div class="mini-stat"><span>Average ticket</span><strong>$443</strong></div>
+              <div class="mini-stat"><span>Lead conversion</span><strong>23%</strong></div>
+            </div>
+          </div>
+
+          <div class="right-stack">
+            <div class="card dark-card">
+              <div class="card-head" style="position:relative;z-index:2;">
+                <div>
+                  <p class="card-title">Cash overview</p>
+                  <p class="big-number">$4,260</p>
+                  <p class="subtle">Collected and ready after current expenses and fees</p>
+                </div>
+              </div>
+
+              <div class="balance-grid">
+                <div class="balance-box"><span>Open invoices</span><strong>$1,780</strong></div>
+                <div class="balance-box"><span>Pending jobs</span><strong>$2,220</strong></div>
+                <div class="balance-box"><span>Ad spend</span><strong>$620</strong></div>
+                <div class="balance-box"><span>Refunds</span><strong>$90</strong></div>
+              </div>
+            </div>
+
+            <div class="card quick-card">
+              <div class="card-head">
+                <div>
+                  <p class="card-title">Latest work delivered</p>
+                  <p class="subtle">Click any item to open details</p>
+                </div>
+              </div>
+
+              <div class="quick-list">
+                <div class="quick-item open-modal" data-title="Website refresh" data-body="Homepage headline, service blocks, and booking CTA were updated to improve trust and turn more visitors into paying customers.">
+                  <div><b>Website refresh</b><span class="subtle">Copy + layout improvements</span></div>
+                  <strong>Live</strong>
+                </div>
+                <div class="quick-item open-modal" data-title="Lead list delivered" data-body="126 local leads were generated and organized with contact info and service relevance.">
+                  <div><b>Lead list</b><span class="subtle">126 qualified leads added</span></div>
+                  <strong>Ready</strong>
+                </div>
+                <div class="quick-item open-modal" data-title="Ad creatives delivered" data-body="Four ad creative sets were built with hooks, captions, and offer angles designed to drive more bookings.">
+                  <div><b>Ad creatives</b><span class="subtle">4 creative sets built</span></div>
+                  <strong>Ready</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid-4">
+          <div class="card metric-card open-modal" data-title="Gross revenue" data-body="Gross revenue shows the top-line business sales generated during the period before expenses and fees.">
+            <div class="metric-top"><span class="metric-label">Gross revenue</span><span class="green">↑ 16%</span></div>
+            <p class="metric-value">$12,840</p>
+            <div class="spark"><canvas id="spark1"></canvas></div>
+          </div>
+          <div class="card metric-card open-modal" data-title="Qualified leads" data-body="These are leads that fit the target area and service profile and are worth following up with.">
+            <div class="metric-top"><span class="metric-label">Qualified leads</span><span class="green">↑ 21%</span></div>
+            <p class="metric-value">126</p>
+            <div class="spark"><canvas id="spark2"></canvas></div>
+          </div>
+          <div class="card metric-card open-modal" data-title="Average ticket" data-body="Average ticket is the typical amount earned per booked job or customer purchase.">
+            <div class="metric-top"><span class="metric-label">Average ticket</span><span class="green">↑ 9%</span></div>
+            <p class="metric-value">$443</p>
+            <div class="spark"><canvas id="spark3"></canvas></div>
+          </div>
+          <div class="card metric-card open-modal" data-title="Return on ad spend" data-body="This is the estimated money made compared to the ad spend used to bring in new traffic and leads.">
+            <div class="metric-top"><span class="metric-label">Estimated ROAS</span><span class="green">↑ 12%</span></div>
+            <p class="metric-value">4.8x</p>
+            <div class="spark"><canvas id="spark4"></canvas></div>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="card table-card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Top revenue drivers</p>
+                <p class="subtle">Click a row to inspect each service and generated work item</p>
+              </div>
+              <span class="tag">Live</span>
+            </div>
+
+            <table>
+              <thead>
+                <tr><th>Service</th><th>Jobs</th><th>Revenue</th><th>Avg. ticket</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <tr class="clickable open-modal" data-title="Full Detail Package" data-body="This service brought in the most revenue this month. The website and ads were positioned to push this as the main offer.">
+                  <td><div class="product"><div class="avatar">FD</div><div>Full Detail Package<br><span class="subtle">Main offer</span></div></div></td>
+                  <td>11</td>
+                  <td>$4,290</td>
+                  <td>$390</td>
+                  <td><span class="status"><span class="dot"></span> Strong</span></td>
+                </tr>
+                <tr class="clickable open-modal" data-title="Ceramic Coating" data-body="This higher-ticket service has fewer sales but stronger revenue per booking.">
+                  <td><div class="product"><div class="avatar">CC</div><div>Ceramic Coating<br><span class="subtle">Higher-ticket service</span></div></div></td>
+                  <td>6</td>
+                  <td>$3,720</td>
+                  <td>$620</td>
+                  <td><span class="status"><span class="dot"></span> Strong</span></td>
+                </tr>
+                <tr class="clickable open-modal" data-title="Interior Detail" data-body="A solid mid-range service that brings in repeat customers and works well as an upsell.">
+                  <td><div class="product"><div class="avatar">IN</div><div>Interior Detail<br><span class="subtle">Repeat-customer service</span></div></div></td>
+                  <td>8</td>
+                  <td>$2,480</td>
+                  <td>$310</td>
+                  <td><span class="status"><span class="dot"></span> Stable</span></td>
+                </tr>
+                <tr class="clickable open-modal" data-title="Paint Correction" data-body="A smaller-volume but valuable service that can be pushed more through better before-and-after content.">
+                  <td><div class="product"><div class="avatar">PC</div><div>Paint Correction<br><span class="subtle">Upsell opportunity</span></div></div></td>
+                  <td>4</td>
+                  <td>$2,350</td>
+                  <td>$588</td>
+                  <td><span class="status"><span class="dot"></span> Opportunity</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card funnel-card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Revenue funnel</p>
+                <p class="subtle">From traffic to booked money</p>
+              </div>
+            </div>
+
+            <div class="bars">
+              <div class="bar-row"><div class="bar-info"><span>Website visits</span><span>2,840</span></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+              <div class="bar-row"><div class="bar-info"><span>Booking clicks</span><span>492</span></div><div class="track"><div class="fill" style="width:72%"></div></div></div>
+              <div class="bar-row"><div class="bar-info"><span>Qualified leads</span><span>126</span></div><div class="track"><div class="fill" style="width:48%"></div></div></div>
+              <div class="bar-row"><div class="bar-info"><span>Quotes sent</span><span>54</span></div><div class="track"><div class="fill" style="width:29%"></div></div></div>
+              <div class="bar-row"><div class="bar-info"><span>Booked jobs</span><span>29</span></div><div class="track"><div class="fill" style="width:21%"></div></div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="bottom-grid">
+          <div class="card donut-card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Revenue sources</p>
+                <p class="subtle">Split by offer type</p>
+              </div>
+            </div>
+            <div class="donut-wrap"><canvas id="donutChart"></canvas></div>
+          </div>
+
+          <div class="card activity-card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Recent activity</p>
+                <p class="subtle">Money updates and work delivered</p>
+              </div>
+            </div>
+
+            <div class="activity-list">
+              <div class="activity"><div class="activity-icon">$</div><div><b>$1,240 in new bookings added</b><p>Two new ceramic coating jobs and one interior detail booking were tracked.</p></div></div>
+              <div class="activity"><div class="activity-icon">✓</div><div><b>Homepage update published</b><p>Trust-focused copy and new call-to-action blocks are now live.</p></div></div>
+              <div class="activity"><div class="activity-icon">⚡</div><div><b>Follow-up flow improved</b><p>Quote reminder messages are now helping warm leads return and book faster.</p></div></div>
+            </div>
+          </div>
+
+          <div class="card forecast-card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">30-day forecast</p>
+                <p class="subtle">Projected sales if the current trend holds</p>
+              </div>
+              <span class="tag">On pace</span>
+            </div>
+            <div class="forecast-total"><strong>$14,300</strong><span class="green">↑ 11%</span></div>
+            <div class="forecast-chart"><canvas id="forecastChart"></canvas></div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" id="revenue">
+        <div class="grid-4">
+          <div class="card metric-card"><span class="metric-label">Gross revenue</span><p class="metric-value">$12,840</p><p class="subtle">Total sales before costs</p></div>
+          <div class="card metric-card"><span class="metric-label">Net revenue</span><p class="metric-value">$10,980</p><p class="subtle">After ad spend, refunds, and fees</p></div>
+          <div class="card metric-card"><span class="metric-label">Open invoices</span><p class="metric-value">$1,780</p><p class="subtle">Still waiting to be collected</p></div>
+          <div class="card metric-card"><span class="metric-label">Collected cash</span><p class="metric-value">$4,260</p><p class="subtle">Currently cleared</p></div>
+        </div>
+
+        <div class="two-grid">
+          <div class="card large-panel">
+            <div class="card-head"><div><p class="card-title">Revenue over time</p><p class="subtle">Daily money trend</p></div><span class="tag blue-tag">Monthly</span></div>
+            <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
+          </div>
+          <div class="card large-panel">
+            <div class="card-head"><div><p class="card-title">Revenue breakdown</p><p class="subtle">Where the money came from</p></div></div>
+            <div class="list-line"><span>Full Detail Package</span><strong>$4,290</strong></div>
+            <div class="list-line"><span>Ceramic Coating</span><strong>$3,720</strong></div>
+            <div class="list-line"><span>Interior Detail</span><strong>$2,480</strong></div>
+            <div class="list-line"><span>Paint Correction</span><strong>$2,350</strong></div>
+            <div class="list-line"><span>Other add-ons</span><strong>$0</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="services">
+        <div class="two-grid">
+          <div class="card large-panel">
+            <div class="card-head"><div><p class="card-title">Generated work for services</p><p class="subtle">What was created to improve sales</p></div></div>
+            <div class="list-line"><span>Website service page rewrite</span><strong>Done</strong></div>
+            <div class="list-line"><span>Offer positioning for high-ticket services</span><strong>Done</strong></div>
+            <div class="list-line"><span>Pricing layout cleanup</span><strong>Done</strong></div>
+            <div class="list-line"><span>Before/after content plan</span><strong>Ready</strong></div>
+            <div class="button-row">
+              <button class="btn open-modal" data-title="Preview service updates" data-body="This would open the service page updates, pricing layout, and offer positioning built for the client.">Preview updates</button>
+              <button class="btn secondary open-modal" data-title="Service notes" data-body="This would show why each service-page change was recommended and how it helps improve money and bookings.">View notes</button>
+            </div>
+          </div>
+          <div class="card table-card">
+            <div class="card-head"><div><p class="card-title">Service performance</p><p class="subtle">Click a row to inspect each service</p></div></div>
+            <table>
+              <thead><tr><th>Service</th><th>Views</th><th>Bookings</th><th>Revenue</th><th>Conv.</th></tr></thead>
+              <tbody>
+                <tr class="clickable open-modal" data-title="Full Detail Package" data-body="Best overall balance of traffic, bookings, and revenue."><td>Full Detail Package</td><td>640</td><td>11</td><td>$4,290</td><td>5.8%</td></tr>
+                <tr class="clickable open-modal" data-title="Ceramic Coating" data-body="Fewer bookings than the main offer, but much higher ticket value."><td>Ceramic Coating</td><td>390</td><td>6</td><td>$3,720</td><td>4.1%</td></tr>
+                <tr class="clickable open-modal" data-title="Interior Detail" data-body="Strong repeat service and easier entry-point offer."><td>Interior Detail</td><td>510</td><td>8</td><td>$2,480</td><td>4.9%</td></tr>
+                <tr class="clickable open-modal" data-title="Paint Correction" data-body="Solid upsell opportunity that can grow with better proof and visuals."><td>Paint Correction</td><td>280</td><td>4</td><td>$2,350</td><td>3.4%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="leads">
+        <div class="grid-4">
+          <div class="card metric-card"><span class="metric-label">Qualified leads</span><p class="metric-value">126</p><p class="subtle">Filtered and relevant</p></div>
+          <div class="card metric-card"><span class="metric-label">Follow-up needed</span><p class="metric-value">34</p><p class="subtle">Warm leads not closed yet</p></div>
+          <div class="card metric-card"><span class="metric-label">Booked from leads</span><p class="metric-value">29</p><p class="subtle">Lead-to-booking movement</p></div>
+          <div class="card metric-card"><span class="metric-label">Lead value</span><p class="metric-value">$102</p><p class="subtle">Estimated average value per lead</p></div>
+        </div>
+
+        <div class="card table-card">
+          <div class="card-head"><div><p class="card-title">Lead list sample</p><p class="subtle">Example of the generated work</p></div><span class="tag">126 leads total</span></div>
+          <table>
+            <thead><tr><th>Business</th><th>City</th><th>Email</th><th>Phone</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Premier Auto Spa</td><td>Mason</td><td>contact@premierautospa.com</td><td>(513) 555-0182</td><td>Not contacted</td></tr>
+              <tr><td>Detail House</td><td>West Chester</td><td>hello@detailhouse.com</td><td>(513) 555-0214</td><td>Follow-up</td></tr>
+              <tr><td>Shine Garage</td><td>Blue Ash</td><td>book@shinegarage.com</td><td>(513) 555-0191</td><td>Quoted</td></tr>
+              <tr><td>Gloss Lab</td><td>Loveland</td><td>team@glosslab.com</td><td>(513) 555-0156</td><td>Interested</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view" id="marketing">
+        <div class="section-grid">
+          <div class="card detail-card"><p class="card-title">Creative sets built</p><p class="big-number">4</p><p class="subtle">Each set includes hook, caption, and angle.</p></div>
+          <div class="card detail-card"><p class="card-title">Best angle</p><p class="big-number">Before/after</p><p class="subtle">Best click-through rate this cycle.</p></div>
+          <div class="card detail-card"><p class="card-title">Estimated ROAS</p><p class="big-number">4.8x</p><p class="subtle">Sales compared to ad spend.</p></div>
+        </div>
+        <div class="two-grid">
+          <div class="card large-panel">
+            <div class="card-head"><div><p class="card-title">Marketing work delivered</p><p class="subtle">What the client can review</p></div></div>
+            <div class="member-card"><div><strong>Creative Set 1</strong><p class="subtle">Local trust angle + quick booking CTA</p></div><span class="pill">Ready</span></div>
+            <div class="member-card"><div><strong>Creative Set 2</strong><p class="subtle">Before/after transformation angle</p></div><span class="pill">Ready</span></div>
+            <div class="member-card"><div><strong>Creative Set 3</strong><p class="subtle">Seasonal promo angle</p></div><span class="pill">Ready</span></div>
+            <div class="member-card"><div><strong>Creative Set 4</strong><p class="subtle">Customer review angle</p></div><span class="pill">Ready</span></div>
+          </div>
+          <div class="card large-panel">
+            <div class="card-head"><div><p class="card-title">Marketing trend</p><p class="subtle">Traffic and response from creatives</p></div></div>
+            <div class="chart-wrap"><canvas id="marketingChart"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="finance">
+        <div class="grid-4">
+          <div class="card metric-card"><span class="metric-label">Collected cash</span><p class="metric-value">$4,260</p><p class="subtle">Cleared</p></div>
+          <div class="card metric-card"><span class="metric-label">Open invoices</span><p class="metric-value">$1,780</p><p class="subtle">Still to collect</p></div>
+          <div class="card metric-card"><span class="metric-label">Ad spend</span><p class="metric-value">$620</p><p class="subtle">Current month</p></div>
+          <div class="card metric-card"><span class="metric-label">Net margin</span><p class="metric-value">85.5%</p><p class="subtle">Estimated after tracked costs</p></div>
+        </div>
+
+        <div class="card table-card">
+          <div class="card-head"><div><p class="card-title">Finance summary</p><p class="subtle">Recent money movement</p></div></div>
+          <table>
+            <thead><tr><th>Date</th><th>Item</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Jun 24</td><td>Ceramic Coating invoice</td><td>$620</td><td><span class="status"><span class="dot"></span> Paid</span></td></tr>
+              <tr><td>Jun 22</td><td>Meta ad spend</td><td>$180</td><td><span class="status"><span class="dot"></span> Cleared</span></td></tr>
+              <tr><td>Jun 19</td><td>Full Detail Package</td><td>$390</td><td><span class="status"><span class="dot"></span> Paid</span></td></tr>
+              <tr><td>Jun 16</td><td>Paint Correction quote</td><td>$580</td><td><span class="status"><span class="dot"></span> Pending</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view" id="growth">
+        <div class="section-grid">
+          <div class="card detail-card"><p class="card-title">Priority 1</p><p class="metric-value">Push ceramic coating harder</p><p class="subtle">It has one of the best revenue outcomes per booking and could use more front-end traffic.</p></div>
+          <div class="card detail-card"><p class="card-title">Priority 2</p><p class="metric-value">Improve quote follow-up</p><p class="subtle">A faster reminder flow should help open quotes turn into booked money faster.</p></div>
+          <div class="card detail-card"><p class="card-title">Priority 3</p><p class="metric-value">Add more proof</p><p class="subtle">More before/after photos and review screenshots should lift conversion on high-ticket services.</p></div>
+        </div>
+
+        <div class="card large-panel">
+          <div class="card-head"><div><p class="card-title">Action checklist</p><p class="subtle">Click each item when completed</p></div></div>
+          <div class="activity-list" id="checklist">
+            <label class="activity"><input type="checkbox" /> <div><b>Approve homepage headline update</b><p>Lead with the strongest money-making service outcome.</p></div></label>
+            <label class="activity"><input type="checkbox" /> <div><b>Review ad creative set 2</b><p>This was the highest-performing angle in testing.</p></div></label>
+            <label class="activity"><input type="checkbox" /> <div><b>Upload 3 recent before/after photos</b><p>This helps the site and ads sell high-ticket jobs better.</p></div></label>
+            <label class="activity"><input type="checkbox" /> <div><b>Approve quote reminder flow</b><p>This can improve close rate from leads already in the pipeline.</p></div></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="settings">
+        <div class="two-grid">
+          <div class="card large-panel">
+            <div class="card-head"><div><p class="card-title">Dashboard settings</p><p class="subtle">Clickable controls for the preview</p></div></div>
+            <div class="list-line"><span>Dashboard name</span><strong>Business Revenue Dashboard</strong></div>
+            <div class="list-line"><span>Client name</span><strong>West Chester Detailing</strong></div>
+            <div class="list-line"><span>Time zone</span><strong>Eastern Time</strong></div>
+            <div class="button-row">
+              <button class="btn open-modal" data-title="Settings saved" data-body="This preview button shows how the client dashboard settings would work in the real dashboard.">Save changes</button>
+              <button class="btn secondary open-modal" data-title="Share dashboard" data-body="This would invite the business owner or team members to review the dashboard and generated work.">Share dashboard</button>
+            </div>
+          </div>
+          <div class="card large-panel">
+            <div class="card-head"><div><p class="card-title">Notifications</p><p class="subtle">Example alert options</p></div></div>
+            <label class="list-line"><span>Email when new leads are added</span><input type="checkbox" checked /></label>
+            <label class="list-line"><span>Alert when new bookings come in</span><input type="checkbox" checked /></label>
+            <label class="list-line"><span>Weekly money report</span><input type="checkbox" /></label>
+            <label class="list-line"><span>Booking slowdown warning</span><input type="checkbox" checked /></label>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="modal-top">
+        <div>
+          <p class="eyebrow">Dashboard detail</p>
+          <h2 id="modalTitle" style="font-size:26px;">Details</h2>
+        </div>
+        <button class="close" id="closeModal">×</button>
+      </div>
+      <p class="subtle" id="modalBody" style="font-size:15px;line-height:1.55;"></p>
+      <div class="button-row">
+        <button class="btn" id="modalOk">Got it</button>
+        <button class="btn secondary" id="modalSecondary">View revenue</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const pageLabels = {
+    overview: ["Business revenue dashboard", "Money, performance, and generated growth work"],
+    revenue: ["Revenue dashboard", "Sales, net revenue, and where the money came from"],
+    services: ["Services dashboard", "Offer performance and generated service-page work"],
+    leads: ["Leads dashboard", "Lead list delivery and revenue opportunity"],
+    marketing: ["Marketing dashboard", "Ad creatives, response, and money impact"],
+    finance: ["Finance dashboard", "Cash, invoices, spend, and margin"],
+    growth: ["Growth plan", "What to improve next for more revenue"],
+    settings: ["Settings", "Control the client dashboard experience"]
+  };
+
+  const chartInstances = {};
+  const gridColor = "#eef1f6";
+  const textColor = "#697284";
+
+  function makeLineGradient(ctx, color1, color2) {
+    const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+    gradient.addColorStop(0, color1);
+    gradient.addColorStop(1, color2);
+    return gradient;
+  }
+
+  function spark(id, data, color) {
+    const ctx = document.getElementById(id);
+    if (!ctx || chartInstances[id]) return;
+    chartInstances[id] = new Chart(ctx, {
+      type: "line",
+      data: { labels: data.map((_, i) => i + 1), datasets: [{ data, borderColor: color, backgroundColor: "transparent", tension: .45, borderWidth: 2, pointRadius: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false } }
+      }
+    });
+  }
+
+  function lineChart(id, labels, datasets) {
+    const el = document.getElementById(id);
+    if (!el || chartInstances[id]) return;
+    chartInstances[id] = new Chart(el, {
+      type: "line",
+      data: { labels, datasets: datasets.map(d => ({ ...d, tension: .42, borderWidth: 3, pointRadius: 0 })) },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { usePointStyle: true, color: textColor, boxWidth: 8 } } },
+        scales: {
+          y: { ticks: { color: textColor }, grid: { color: gridColor }, border: { display: false } },
+          x: { ticks: { color: textColor }, grid: { display: false }, border: { display: false } }
+        }
+      }
+    });
+  }
+
+  function barChart(id, labels, data, currency=false) {
+    const el = document.getElementById(id);
+    if (!el || chartInstances[id]) return;
+    chartInstances[id] = new Chart(el, {
+      type: "bar",
+      data: { labels, datasets: [{ data, backgroundColor: ["#dbeafe","#bfdbfe","#93c5fd","#27e38c","#8b5cf6"].slice(0, data.length), borderRadius: 10 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            ticks: {
+              color: textColor,
+              callback: value => currency ? "$" + value : value
+            },
+            grid: { color: gridColor }, border: { display: false }
+          },
+          x: { ticks: { color: textColor }, grid: { display: false }, border: { display: false } }
+        }
+      }
+    });
+  }
+
+  function donutChart(id, labels, data) {
+    const el = document.getElementById(id);
+    if (!el || chartInstances[id]) return;
+    chartInstances[id] = new Chart(el, {
+      type: "doughnut",
+      data: { labels, datasets: [{ data, backgroundColor: ["#1aa7ff","#27e38c","#8b5cf6","#f6c44f"], borderWidth: 0, hoverOffset: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: "70%",
+        plugins: { legend: { position: "bottom", labels: { usePointStyle: true, color: textColor, boxWidth: 8 } } }
+      }
+    });
+  }
+
+  function initOverviewCharts() {
+    const salesEl = document.getElementById("salesChart");
+    if (salesEl && !chartInstances.salesChart) {
+      chartInstances.salesChart = new Chart(salesEl, {
+        type: "line",
+        data: {
+          labels: ["Jun 1","Jun 4","Jun 7","Jun 10","Jun 13","Jun 16","Jun 19","Jun 22","Jun 25","Jun 28","Jun 30"],
+          datasets: [
+            {
+              label: "Current period",
+              data: [280, 390, 510, 320, 590, 420, 340, 560, 480, 710, 640],
+              borderColor: "#1aa7ff",
+              backgroundColor: makeLineGradient(salesEl.getContext("2d"), "rgba(26,167,255,.22)", "rgba(26,167,255,0)"),
+              fill: true, tension: .42, borderWidth: 3, pointRadius: 0
+            },
+            {
+              label: "Previous period",
+              data: [250, 310, 430, 290, 470, 350, 300, 470, 410, 560, 510],
+              borderColor: "rgba(26,167,255,.28)",
+              borderDash: [5,5], fill: false, tension: .42, borderWidth: 3, pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom", labels: { usePointStyle: true, color: textColor, boxWidth: 8 } } },
+          scales: {
+            y: { ticks: { color: textColor, callback: value => "$" + value }, grid: { color: gridColor }, border: { display: false } },
+            x: { ticks: { color: textColor }, grid: { display: false }, border: { display: false } }
+          }
+        }
+      });
+    }
+
+    spark("spark1", [9200, 9750, 10040, 10410, 10880, 11020, 11390, 11840, 12120, 12560, 12840], "#8b5cf6");
+    spark("spark2", [74, 79, 84, 88, 93, 97, 102, 108, 115, 121, 126], "#1aa7ff");
+    spark("spark3", [372, 384, 390, 401, 406, 415, 423, 431, 436, 441, 443], "#19b56f");
+    spark("spark4", [3.1, 3.4, 3.7, 3.9, 4.0, 4.1, 4.3, 4.4, 4.5, 4.7, 4.8], "#f6c44f");
+
+    donutChart("donutChart", ["Full Detail", "Ceramic Coating", "Interior Detail", "Paint Correction"], [34, 29, 19, 18]);
+    barChart("forecastChart", ["Week 1","Week 2","Week 3","Week 4"], [2900, 3400, 3700, 4300], true);
+  }
+
+  function initViewCharts(view) {
+    if (view === "overview") initOverviewCharts();
+    if (view === "revenue") {
+      lineChart("revenueChart", ["Week 1","Week 2","Week 3","Week 4"], [
+        { label: "Gross revenue", data: [2600, 3100, 3280, 3860], borderColor: "#1aa7ff", backgroundColor: "rgba(26,167,255,.08)", fill: true },
+        { label: "Net revenue", data: [2250, 2670, 2840, 3220], borderColor: "#19b56f", backgroundColor: "transparent", fill: false }
+      ]);
+    }
+    if (view === "marketing") {
+      lineChart("marketingChart", ["Week 1","Week 2","Week 3","Week 4"], [
+        { label: "Clicks", data: [74, 92, 108, 131], borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,.08)", fill: true },
+        { label: "Lead conversions", data: [12, 16, 18, 23], borderColor: "#1aa7ff", backgroundColor: "transparent", fill: false }
+      ]);
+    }
+  }
+
+  function switchView(view) {
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    document.getElementById(view).classList.add("active");
+    document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
+    document.querySelector(`.nav button[data-view="${view}"]`).classList.add("active");
+    document.getElementById("pageEyebrow").textContent = pageLabels[view][0];
+    document.getElementById("pageTitle").textContent = pageLabels[view][1];
+    initViewCharts(view);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  document.querySelectorAll(".nav button").forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
+
+  const modal = document.getElementById("modalBackdrop");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalBody = document.getElementById("modalBody");
+
+  function openModal(title, body) {
+    modalTitle.textContent = title;
+    modalBody.textContent = body;
+    modal.classList.add("active");
+  }
+
+  document.addEventListener("click", (e) => {
+    const target = e.target.closest(".open-modal");
+    if (target) openModal(target.dataset.title, target.dataset.body);
+  });
+
+  document.getElementById("closeModal").addEventListener("click", () => modal.classList.remove("active"));
+  document.getElementById("modalOk").addEventListener("click", () => modal.classList.remove("active"));
+  document.getElementById("modalSecondary").addEventListener("click", () => { modal.classList.remove("active"); switchView("revenue"); });
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("active"); });
+
+  document.getElementById("searchBox").addEventListener("input", (e) => {
+    const value = e.target.value.toLowerCase().trim();
+    if (!value) return;
+    if (value.includes("revenue") || value.includes("sales") || value.includes("money")) switchView("revenue");
+    if (value.includes("service")) switchView("services");
+    if (value.includes("lead")) switchView("leads");
+    if (value.includes("marketing") || value.includes("ad") || value.includes("creative")) switchView("marketing");
+    if (value.includes("finance") || value.includes("cash") || value.includes("invoice")) switchView("finance");
+    if (value.includes("growth") || value.includes("plan")) switchView("growth");
+  });
+
+  document.querySelectorAll("#checklist input").forEach(input => {
+    input.addEventListener("change", () => {
+      input.closest(".activity").style.opacity = input.checked ? ".55" : "1";
+      input.closest(".activity").style.textDecoration = input.checked ? "line-through" : "none";
+    });
+  });
+
+  initOverviewCharts();
+</script>
+</body>
+</html>
